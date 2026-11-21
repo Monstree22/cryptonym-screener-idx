@@ -368,7 +368,7 @@ def export_json(df: pd.DataFrame, hist: dict, path: Path, n_close: int = 60):
         clean["closes"] = [round(float(x), 2) for x in h["Close"].iloc[-n_close:]] if h is not None else []
         rows.append(clean)
     tanggal = max((r.get("tanggal_data") or "" for r in rows), default="")
-    payload = {"tanggal_data": tanggal, "dibuat": datetime.now().isoformat(timespec="minutes"), "saham": rows}
+    payload = {"tanggal_data": tanggal, "saham": rows}  # tanpa timestamp: hari libur tidak memicu commit
     path.write_text(json.dumps(payload, ensure_ascii=False, default=str), encoding="utf-8")
     print(f"JSON untuk website: {path.resolve()}")
 
