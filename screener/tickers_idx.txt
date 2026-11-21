@@ -1,0 +1,99 @@
+# Daftar saham yang di-screen (satu kode per baris, tanpa .JK juga boleh)
+# Tambah/hapus sesuka kamu. Baris diawali # diabaikan.
+# Untuk semua saham IDX: unduh daftar dari idx.co.id > Data Pasar > Daftar Saham, lalu tempel kodenya di sini.
+
+# Bank & keuangan
+BBCA
+BBRI
+BMRI
+BBNI
+BRIS
+BBTN
+BNGA
+PNBN
+BJBR
+BJTM
+BTPS
+ARTO
+
+# Telko & infrastruktur
+TLKM
+ISAT
+EXCL
+TOWR
+TBIG
+MTEL
+JSMR
+PGAS
+
+# Konsumer
+UNVR
+ICBP
+INDF
+MYOR
+KLBF
+SIDO
+HMSP
+GGRM
+CPIN
+JPFA
+AMRT
+MAPI
+ACES
+ERAA
+
+# Energi & tambang
+ADRO
+PTBA
+ITMG
+HRUM
+INDY
+BUMI
+MEDC
+ENRG
+PGEO
+ANTM
+INCO
+MDKA
+TINS
+MBMA
+NCKL
+AMMN
+
+# Industri, otomotif, kimia
+ASII
+UNTR
+AUTO
+AKRA
+SMGR
+INTP
+BRPT
+TPIA
+ESSA
+INKP
+TKIM
+
+# Properti
+BSDE
+CTRA
+PWON
+SMRA
+
+# Teknologi & media
+GOTO
+BUKA
+EMTK
+SCMA
+MNCN
+
+# Kesehatan
+HEAL
+MIKA
+SILO
+
+# Perkebunan
+AALI
+LSIP
+DSNG
+TAPG
+SSMS

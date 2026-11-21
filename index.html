@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cryptonym Screener IDX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: hero split (judul | chart hidup), pita running trade, lalu panel filter sticky + tabel hasil */
+  --ink: #0a101b;
+  --panel: #111a29;
+  --panel-2: #162136;
+  --line: #22314a;
+  --text: #e6ebf2;
+  --muted: #8d99ab;
+  --accent: #f1b44c;
+  --up: #34c07a;
+  --down: #ef5b5b;
+  --display: "Unbounded", "Arial Black", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ink); color: var(--text); font-family: var(--body); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 24px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.up { color: var(--up); } .down { color: var(--down); } .mut { color: var(--muted); }
+
+/* ---------- top bar ---------- */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; }
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand b { font-family: var(--display); font-weight: 800; letter-spacing: .08em; font-size: 15px; }
+.brand span { color: var(--muted); font-size: 13px; }
+.stamp { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; display: flex; gap: 8px; align-items: center; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+/* ---------- hero ---------- */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 40px; align-items: center; padding: 28px 0 36px; }
+.hero h1 { font-family: var(--display); font-weight: 800; font-size: clamp(34px, 4.6vw, 64px); line-height: 1.02; letter-spacing: -.02em; margin: 0 0 20px; text-wrap: balance; }
+.hero h1 .w { display: inline-block; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.lede { color: var(--muted); font-size: 17px; max-width: 46ch; margin: 0 0 28px; }
+.lede strong { color: var(--text); font-weight: 500; }
+.hero-stats { display: flex; gap: 28px; flex-wrap: wrap; }
+.hs b { display: block; font-family: var(--display); font-weight: 600; font-size: 30px; line-height: 1; }
+.hs span { font-size: 13px; color: var(--muted); }
+.hs.acc b { color: var(--accent); }
+.cta { display: inline-flex; align-items: center; gap: 10px; margin-top: 30px; background: var(--accent); color: #1a1205; text-decoration: none; font-weight: 600; padding: 12px 20px; border-radius: 10px; }
+.cta:hover { filter: brightness(1.08); }
+.chart-card { position: relative; background: linear-gradient(180deg, var(--panel), var(--ink)); border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
+.chart-head { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; color: var(--muted); padding: 2px 6px 10px; }
+.chart-head b { color: var(--text); font-weight: 500; }
+#hero-canvas { display: block; width: 100%; height: 340px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero h1 .w { animation: rise .7s cubic-bezier(.2,.7,.2,1) both; }
+  .lede, .hero-stats, .cta { animation: rise .7s .45s cubic-bezier(.2,.7,.2,1) both; }
+}
+@keyframes rise { from { transform: translateY(14px); opacity: .001; } to { transform: none; opacity: 1; } }
+
+/* ---------- tape ---------- */
+.tape { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow: hidden; background: var(--panel); }
+.tape-track { display: flex; width: max-content; gap: 34px; padding: 10px 0; font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+.tape-item b { font-weight: 500; margin-right: 6px; }
+@media (prefers-reduced-motion: no-preference) {
+  .tape-track { animation: tape 70s linear infinite; }
+  .tape:hover .tape-track { animation-play-state: paused; }
+}
+@keyframes tape { to { transform: translateX(-50%); } }
+
+/* ---------- screener ---------- */
+.screener { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 24px; padding: 40px 0 60px; align-items: start; }
+.filters { position: sticky; top: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 18px; }
+.filters h2, .results h2 { font-family: var(--display); font-weight: 600; font-size: 15px; letter-spacing: .02em; margin: 0; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--panel-2); border-radius: 999px; padding: 5px 11px; font-size: 13px; cursor: pointer; }
+.chip:hover { border-color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--accent); color: #1a1205; border-color: var(--accent); font-weight: 600; }
+.group { display: grid; gap: 12px; }
+.group-t { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+.field { display: grid; gap: 4px; }
+.field-row { display: flex; justify-content: space-between; font-size: 13px; }
+.field-row output { font-family: var(--mono); color: var(--accent); }
+input[type="range"] { width: 100%; accent-color: var(--accent); height: 18px; }
+.switch { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.switch input { accent-color: var(--accent); width: 16px; height: 16px; }
+.reset { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 8px; cursor: pointer; color: var(--muted); font-size: 13px; }
+.reset:hover { color: var(--text); }
+
+.results { min-width: 0; display: grid; gap: 16px; }
+.res-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; }
+.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.sum { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.sum b { font-family: var(--display); font-size: 24px; font-weight: 600; display: block; line-height: 1.1; }
+.sum span { font-size: 12px; color: var(--muted); }
+.sum.acc { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.sum.acc b { color: var(--accent); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 14px; cursor: pointer; color: var(--muted); font-size: 14px; margin-bottom: -1px; }
+.tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.tab .n { font-family: var(--mono); font-size: 12px; margin-left: 6px; color: var(--muted); }
+.tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.search { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; width: 180px; }
+.btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: var(--muted); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+th:first-child, td:first-child { padding-left: 14px; } th:last-child, td:last-child { padding-right: 14px; }
+th { text-align: right; font-weight: 500; color: var(--muted); font-size: 12px; padding: 10px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--panel); }
+th:first-child, td:first-child { text-align: left; }
+th[aria-sort="ascending"]::after { content: " ↑"; color: var(--accent); }
+th[aria-sort="descending"]::after { content: " ↓"; color: var(--accent); }
+th.nosort { cursor: default; }
+td { padding: 9px 8px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); text-align: right; white-space: nowrap; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+tbody tr { cursor: pointer; transition: background .15s; }
+tbody tr:hover { background: var(--panel-2); }
+tbody tr:last-child td { border-bottom: 0; }
+.tk b { font-family: var(--body); font-weight: 600; font-size: 14px; display: block; }
+.tk span { font-family: var(--body); color: var(--muted); font-size: 12px; display: block; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+.pill { display: inline-block; font-family: var(--body); font-size: 11.5px; font-weight: 600; border-radius: 999px; padding: 2px 9px; }
+.pill.spike-up { background: color-mix(in srgb, var(--up) 18%, transparent); color: var(--up); }
+.pill.spike-dn { background: color-mix(in srgb, var(--down) 18%, transparent); color: var(--down); }
+.pill.akum { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.pill.fail { background: var(--panel-2); color: var(--muted); font-weight: 500; }
+.score { display: inline-flex; align-items: center; gap: 8px; }
+.bar { width: 54px; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.empty { padding: 40px; text-align: center; color: var(--muted); font-family: var(--body); }
+
+/* ---------- drawer ---------- */
+.scrim { position: fixed; inset: 0; background: rgb(3 6 12 / .6); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 10; }
+.drawer { position: fixed; top: 0; right: 0; height: 100%; width: min(440px, 100%); background: var(--panel); border-left: 1px solid var(--line); z-index: 11; transform: translateX(100%); transition: transform .28s cubic-bezier(.2,.7,.2,1); overflow-y: auto; padding: 24px; display: grid; gap: 18px; align-content: start; }
+.open .scrim { opacity: 1; pointer-events: auto; }
+.open .drawer { transform: none; }
+.d-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.d-head h3 { font-family: var(--display); font-size: 28px; margin: 0; }
+.d-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.close { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 18px; }
+.d-price { display: flex; align-items: baseline; gap: 6px 12px; flex-wrap: wrap; }
+#d-chg { font-size: 13px; }
+.d-price b { font-family: var(--mono); font-size: 30px; font-weight: 500; }
+#d-chart { width: 100%; height: 160px; display: block; }
+.checks { display: grid; gap: 6px; }
+.check { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; background: var(--panel-2); border-radius: 8px; padding: 8px 10px; font-size: 13.5px; }
+.check i { font-style: normal; font-weight: 700; text-align: center; }
+.check .num { color: var(--muted); }
+.d-note { font-size: 12.5px; color: var(--muted); }
+
+/* ---------- footer ---------- */
+.method { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; padding: 36px 0; border-top: 1px solid var(--line); }
+.method h3 { font-family: var(--display); font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+.method p, .method li { color: var(--muted); font-size: 14px; margin: 0; }
+.method ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+code { font-family: var(--mono); font-size: 12.5px; background: var(--panel-2); padding: 1px 6px; border-radius: 5px; color: var(--text); }
+.foot { padding: 20px 0 40px; color: var(--muted); font-size: 12.5px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translate(-50%, 20px); background: var(--accent); color: #1a1205; padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 14px; opacity: 0; transition: .25s; pointer-events: none; z-index: 20; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 980px) {
+  .hero { grid-template-columns: 1fr; gap: 28px; }
+  .screener { grid-template-columns: 1fr; }
+  .filters { position: static; }
+  .method { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .wrap { padding: 0 16px; }
+  .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #hero-canvas { height: 260px; }
+  .stamp { display: none; }
+  .search { width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><b>CRYPTONYM</b><span>@cryptonym.trade</span></div>
+    <div class="stamp"><span class="dot"></span><span id="stamp">Data penutupan</span></div>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h1 id="headline"><span class="w">Murah,</span> <span class="w">untung,</span> <span class="w">dan</span> <em class="w">mulai</em> <em class="w">diburu.</em></h1>
+      <p class="lede">Screener saham IDX dalam dua lapis: <strong>fundamental</strong> untuk memastikan perusahaannya sehat, lalu <strong>jejak volume</strong> untuk melihat kapan uang besar mulai masuk.</p>
+      <div class="hero-stats">
+        <div class="hs"><b id="hs-total" class="num">0</b><span>saham dipindai</span></div>
+        <div class="hs acc"><b id="hs-watch" class="num">0</b><span>masuk watchlist</span></div>
+        <div class="hs"><b id="hs-spike" class="num">0</b><span>volume spike hari ini</span></div>
+      </div>
+      <a class="cta" href="#screener">Buka screener <span aria-hidden="true">→</span></a>
+    </div>
+    <div class="chart-card">
+      <div class="chart-head"><span><b id="hc-code">MBMA</b> · 1D</span><span id="hc-tag">akumulasi → breakout</span></div>
+      <canvas id="hero-canvas" aria-label="Animasi chart candlestick: fase akumulasi diikuti lonjakan volume dan breakout"></canvas>
+    </div>
+  </section>
+</div>
+
+<div class="tape" aria-label="Pergerakan harga penutupan terakhir"><div class="tape-track" id="tape"></div></div>
+
+<div class="wrap">
+  <section class="screener" id="screener">
+    <aside class="filters" aria-label="Filter screener">
+      <h2>Atur filter</h2>
+      <div class="presets" role="group" aria-label="Preset">
+        <button class="chip" data-preset="default" aria-pressed="true">Default</button>
+        <button class="chip" data-preset="value" aria-pressed="false">Value ketat</button>
+        <button class="chip" data-preset="dividen" aria-pressed="false">Pemburu dividen</button>
+        <button class="chip" data-preset="bandar" aria-pressed="false">Bandar masuk</button>
+      </div>
+
+      <div class="group">
+        <div class="group-t"><span>Fundamental</span></div>
+        <div class="field"><div class="field-row"><label for="f-per">PER maks</label><output id="o-per"></output></div><input type="range" id="f-per" min="5" max="40" step="1"></div>
+        <div class="field"><div class="field-row"><label for="f-pbv">PBV maks</label><output id="o-pbv"></output></div><input type="range" id="f-pbv" min="0.5" max="6" step="0.1"></div>
+        <div class="field"><div class="field-row"><label for="f-roe">ROE min</label><output id="o-roe"></output></div><input type="range" id="f-roe" min="0" max="30" step="1"></div>
+        <div class="field"><div class="field-row"><label for="f-der">DER maks (non-bank)</label><output id="o-der"></output></div><input type="range" id="f-der" min="0.2" max="3" step="0.1"></div>
+        <div class="field"><div class="field-row"><label for="f-dy">Dividen yield min</label><output id="o-dy"></output></div><input type="range" id="f-dy" min="0" max="12" step="0.5"></div>
+        <label class="switch"><input type="checkbox" id="f-growth"> Laba harus tumbuh (YoY)</label>
+      </div>
+
+      <div class="group">
+        <div class="group-t"><span>Likuiditas &amp; bandar</span></div>
+        <div class="field"><div class="field-row"><label for="f-val">Nilai transaksi 20H min</label><output id="o-val"></output></div><input type="range" id="f-val" min="0" max="100" step="1"></div>
+        <div class="field"><div class="field-row"><label for="f-spike">Volume spike</label><output id="o-spike"></output></div><input type="range" id="f-spike" min="1.2" max="5" step="0.1"></div>
+        <div class="field"><div class="field-row"><label for="f-akum">Akumulasi (median vol 5H)</label><output id="o-akum"></output></div><input type="range" id="f-akum" min="1" max="3" step="0.1"></div>
+      </div>
+      <button class="reset" id="reset">Kembalikan ke default</button>
+    </aside>
+
+    <div class="results">
+      <div class="res-head">
+        <h2 id="res-title">Watchlist utama</h2>
+        <div class="tools">
+          <input class="search" id="search" type="search" placeholder="Cari kode / nama" aria-label="Cari saham">
+          <button class="btn" id="copy">Salin kode</button>
+        </div>
+      </div>
+      <div class="summary">
+        <div class="sum acc"><b id="s-watch" class="num">0</b><span>Fundamental + likuid</span></div>
+        <div class="sum"><b id="s-fund" class="num">0</b><span>Lolos fundamental</span></div>
+        <div class="sum"><b id="s-spike" class="num">0</b><span>Volume spike</span></div>
+        <div class="sum"><b id="s-akum" class="num">0</b><span>Akumulasi senyap</span></div>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" data-tab="watch" aria-selected="true">Watchlist<span class="n" id="n-watch"></span></button>
+        <button class="tab" role="tab" data-tab="bandar" aria-selected="false">Sinyal bandar<span class="n" id="n-bandar"></span></button>
+        <button class="tab" role="tab" data-tab="near" aria-selected="false">Hampir lolos<span class="n" id="n-near"></span></button>
+        <button class="tab" role="tab" data-tab="all" aria-selected="false">Semua<span class="n" id="n-all"></span></button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr id="thead"></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="method">
+    <div>
+      <h3>Cara membaca sinyal</h3>
+      <ul>
+        <li><b>Volume spike</b>: volume hari terakhir di atas batas × rata-rata 20 hari.</li>
+        <li><b>Akumulasi senyap</b>: median volume 5 hari naik, harga belum bergerak lebih dari 5%.</li>
+        <li><b>Hampir lolos</b>: gagal di satu kriteria fundamental saja.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Keterbatasan data</h3>
+      <p>Data dari Yahoo Finance. Broker summary dan foreign flow tidak tersedia, jadi cek ulang di Stockbit sebelum entry. Angka fundamental bisa telat diperbarui; PBV emiten berlaporan USD sudah dikonversi ke Rupiah.</p>
+    </div>
+    <div>
+      <h3>Update data</h3>
+      <p>Jalankan <code>python screener_idx.py --json data.json</code> setelah bursa tutup, lalu publish ulang halaman ini dengan file tersebut.</p>
+    </div>
+  </section>
+  <footer class="foot">
+    <span>Bukan rekomendasi beli/jual. Lakukan riset sendiri.</span>
+    <span id="foot-date"></span>
+  </footer>
+</div>
+
+<div id="drawer-root">
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-label="Detail saham" aria-hidden="true">
+    <div class="d-head"><div><h3 id="d-code"></h3><p id="d-name"></p></div><button class="close" id="d-close" aria-label="Tutup detail">×</button></div>
+    <div class="d-price"><b id="d-price"></b><span id="d-chg" class="num"></span></div>
+    <canvas id="d-chart" aria-label="Grafik harga 60 hari"></canvas>
+    <div><div class="group-t" style="margin-bottom:8px"><span>Checklist fundamental</span><span id="d-score"></span></div><div class="checks" id="d-checks"></div></div>
+    <div><div class="group-t" style="margin-bottom:8px"><span>Likuiditas</span></div><div class="checks" id="d-liq"></div></div>
+    <p class="d-note" id="d-note"></p>
+  </aside>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+let DATA = { tanggal_data: "", saham: [] };
+
+const DEFAULT = { per: 15, pbv: 2, roe: 12, der: 1, dy: 0, growth: true, val: 5, spike: 2, akum: 1.3 };
+const PRESETS = {
+  default: { ...DEFAULT },
+  value: { ...DEFAULT, per: 10, pbv: 1, roe: 10 },
+  dividen: { ...DEFAULT, per: 15, pbv: 3, roe: 10, dy: 5, growth: false },
+  bandar: { per: 40, pbv: 6, roe: 0, der: 3, dy: 0, growth: false, val: 10, spike: 2, akum: 1.3 },
+};
+const KEUANGAN = "Financial Services";
+const MIN_HARGA = 50, MIN_VAL_HARI_INI = 1e9, AKUM_MAX_GERAK = 0.05;
+
+let F = { ...DEFAULT };
+let HERO_LABEL = "VOLUME SPIKE";
+let tab = "watch", sortKey = "skor", sortDir = -1, query = "";
+const $ = (id) => document.getElementById(id);
+const nf = new Intl.NumberFormat("id-ID");
+const nf1 = new Intl.NumberFormat("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const nf2 = new Intl.NumberFormat("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+const pct = (v, sign = true) => isNum(v) ? (sign && v > 0 ? "+" : "") + nf1.format(v * 100) + "%" : "–";
+const rp = (v) => {
+  if (!isNum(v)) return "–";
+  if (v >= 1e12) return nf1.format(v / 1e12) + " T";
+  if (v >= 1e9) return nf1.format(v / 1e9) + " M";
+  if (v >= 1e6) return nf1.format(v / 1e6) + " jt";
+  return nf.format(v);
+};
+const cls = (v) => !isNum(v) ? "mut" : v > 0 ? "up" : v < 0 ? "down" : "mut";
+
+/* ---------- logika screener (sama dengan screener_idx.py) ---------- */
+function evaluate(s) {
+  const likuid = isNum(s.harga) && s.harga >= MIN_HARGA && (s.avg_value_20d ?? 0) >= F.val * 1e9 && (s.value_hari_ini ?? 0) >= MIN_VAL_HARI_INI;
+  const spike = likuid && isNum(s.vol_ratio) && s.vol_ratio >= F.spike;
+  const akum = likuid && !spike && isNum(s.vol_ratio_5d) && s.vol_ratio_5d >= F.akum && isNum(s.chg_5d) && Math.abs(s.chg_5d) <= AKUM_MAX_GERAK;
+
+  const keu = s.sektor === KEUANGAN;
+  const checks = [
+    { k: "PER", v: s.per, ok: (v) => v > 0 && v <= F.per, show: (v) => nf2.format(v) + "x", rule: "0–" + F.per + "x" },
+    { k: "PBV", v: s.pbv, ok: (v) => v > 0 && v <= F.pbv, show: (v) => nf2.format(v) + "x", rule: "≤ " + nf1.format(F.pbv) + "x" },
+    { k: "ROE", v: s.roe, ok: (v) => v >= F.roe / 100, show: (v) => pct(v, false), rule: "≥ " + F.roe + "%" },
+  ];
+  if (!keu) checks.push({ k: "DER", v: s.der, ok: (v) => v <= F.der, show: (v) => nf2.format(v) + "x", rule: "≤ " + nf1.format(F.der) + "x" });
+  if (F.dy > 0) checks.push({ k: "Dividen", v: s.div_yield, ok: (v) => v >= F.dy / 100, show: (v) => pct(v, false), rule: "≥ " + nf1.format(F.dy) + "%" });
+  if (F.growth) checks.push({ k: "Laba YoY", v: s.earnings_growth, ok: (v) => v > 0, show: (v) => pct(v), rule: "> 0%" });
+  const gagal = [];
+  for (const c of checks) {
+    c.pass = isNum(c.v) && c.ok(c.v);
+    c.na = !isNum(c.v);
+    if (!c.pass) gagal.push(c.na ? c.k + " n/a" : c.k);
+  }
+  const fund = gagal.length === 0;
+  const near = gagal.length === 1 && !gagal[0].includes("n/a");
+
+  let skor = 0;
+  if (isNum(s.per) && s.per > 0) skor += Math.max(0, 25 * (1 - s.per / (F.per * 2)));
+  if (isNum(s.pbv) && s.pbv > 0) skor += Math.max(0, 20 * (1 - s.pbv / (F.pbv * 2)));
+  if (isNum(s.roe)) skor += Math.min(25, Math.max(0, s.roe / 0.25 * 25));
+  if (isNum(s.div_yield)) skor += Math.min(15, s.div_yield / 0.08 * 15);
+  if (isNum(s.earnings_growth)) skor += Math.min(15, Math.max(0, s.earnings_growth / 0.3 * 15));
+
+  return { ...s, likuid, spike, akum, fund, near, gagal, checks, skor: Math.round(skor * 10) / 10 };
+}
+
+/* ---------- tabel ---------- */
+const COLS = [
+  { key: "kode", label: "Saham" },
+  { key: "harga", label: "Harga" },
+  { key: "chg_1d", label: "1H" },
+  { key: "chg_5d", label: "5H" },
+  { key: "spark", label: "60 hari", nosort: true },
+  { key: "per", label: "PER" },
+  { key: "pbv", label: "PBV" },
+  { key: "roe", label: "ROE" },
+  { key: "div_yield", label: "Div" },
+  { key: "avg_value_20d", label: "Nilai 20H" },
+  { key: "vol_ratio", label: "Vol ×" },
+  { key: "sinyal", label: "Sinyal" },
+  { key: "skor", label: "Skor" },
+];
+
+function spark(closes, w = 76, h = 24) {
+  if (!closes || closes.length < 2) return "";
+  const mn = Math.min(...closes), mx = Math.max(...closes), r = mx - mn || 1;
+  const pts = closes.map((c, i) => [(i / (closes.length - 1)) * (w - 4) + 2, h - 3 - ((c - mn) / r) * (h - 6)]);
+  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
+  const up = closes[closes.length - 1] >= closes[0];
+  const col = up ? "var(--up)" : "var(--down)";
+  const last = pts[pts.length - 1];
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}L${w - 2} ${h}L2 ${h}Z" fill="${col}" opacity=".12"/><path d="${d}" fill="none" stroke="${col}" stroke-width="1.4"/><circle cx="${last[0]}" cy="${last[1]}" r="2.2" fill="${col}"/></svg>`;
+}
+
+function signalPills(s) {
+  const out = [];
+  if (s.spike) out.push(`<span class="pill ${s.chg_1d >= 0 ? "spike-up" : "spike-dn"}">Spike ${s.chg_1d >= 0 ? "naik" : "turun"}</span>`);
+  if (s.akum) out.push(`<span class="pill akum">Akumulasi</span>`);
+  if (!out.length && tab === "near") out.push(`<span class="pill fail">Gagal: ${s.gagal[0]}</span>`);
+  return out.join(" ") || `<span class="mut">–</span>`;
+}
+
+function sortVal(s, k) {
+  if (k === "sinyal") return (s.spike ? 2 : 0) + (s.akum ? 1 : 0);
+  if (k === "kode") return s.kode;
+  return isNum(s[k]) ? s[k] : -Infinity;
+}
+
+let rowsCache = [];
+function render() {
+  const all = DATA.saham.map(evaluate);
+  const sets = {
+    watch: all.filter((s) => s.fund && s.likuid),
+    bandar: all.filter((s) => s.spike || s.akum),
+    near: all.filter((s) => s.near),
+    all,
+  };
+  $("s-watch").textContent = sets.watch.length;
+  $("s-fund").textContent = all.filter((s) => s.fund).length;
+  $("s-spike").textContent = all.filter((s) => s.spike).length;
+  $("s-akum").textContent = all.filter((s) => s.akum).length;
+  for (const t of Object.keys(sets)) $("n-" + t).textContent = sets[t].length;
+  $("res-title").textContent = { watch: "Watchlist utama", bandar: "Sinyal likuiditas / bandar", near: "Hampir lolos", all: "Semua saham" }[tab];
+
+  const q = query.trim().toLowerCase();
+  let rows = sets[tab].filter((s) => !q || s.kode.toLowerCase().includes(q) || (s.nama || "").toLowerCase().includes(q));
+  rows.sort((a, b) => {
+    const va = sortVal(a, sortKey), vb = sortVal(b, sortKey);
+    return (typeof va === "string" ? va.localeCompare(vb) : va - vb) * sortDir;
+  });
+  rowsCache = rows;
+
+  $("thead").innerHTML = COLS.map((c) => {
+    const sort = c.key === sortKey ? (sortDir > 0 ? "ascending" : "descending") : "none";
+    return `<th data-key="${c.key}" class="${c.nosort ? "nosort" : ""}" aria-sort="${c.nosort ? "none" : sort}">${c.label}</th>`;
+  }).join("");
+
+  if (!rows.length) {
+    $("tbody").innerHTML = `<tr><td colspan="${COLS.length}" class="empty">Tidak ada saham yang cocok. Coba longgarkan filter di panel kiri.</td></tr>`;
+    return;
+  }
+  $("tbody").innerHTML = rows.map((s, i) => `
+    <tr data-i="${i}" tabindex="0">
+      <td class="tk"><b>${s.kode}</b><span>${s.nama || ""}</span></td>
+      <td>${nf.format(s.harga)}</td>
+      <td class="${cls(s.chg_1d)}">${pct(s.chg_1d)}</td>
+      <td class="${cls(s.chg_5d)}">${pct(s.chg_5d)}</td>
+      <td>${spark(s.closes)}</td>
+      <td>${isNum(s.per) ? nf1.format(s.per) : "–"}</td>
+      <td>${isNum(s.pbv) ? nf2.format(s.pbv) : "–"}</td>
+      <td>${pct(s.roe, false)}</td>
+      <td>${pct(s.div_yield, false)}</td>
+      <td>${rp(s.avg_value_20d)}</td>
+      <td class="${isNum(s.vol_ratio) && s.vol_ratio >= F.spike ? "up" : ""}">${isNum(s.vol_ratio) ? nf2.format(s.vol_ratio) : "–"}</td>
+      <td>${signalPills(s)}</td>
+      <td><span class="score"><span class="bar"><i style="width:${Math.min(100, s.skor)}%"></i></span>${nf1.format(s.skor)}</span></td>
+    </tr>`).join("");
+}
+
+/* ---------- filter UI ---------- */
+const FIELDS = {
+  per: { fmt: (v) => v + "x" },
+  pbv: { fmt: (v) => nf1.format(v) + "x" },
+  roe: { fmt: (v) => v + "%" },
+  der: { fmt: (v) => nf1.format(v) + "x" },
+  dy: { fmt: (v) => v > 0 ? nf1.format(v) + "%" : "bebas" },
+  val: { fmt: (v) => v > 0 ? "Rp" + v + " M" : "bebas" },
+  spike: { fmt: (v) => "≥ " + nf1.format(v) + "×" },
+  akum: { fmt: (v) => "≥ " + nf1.format(v) + "×" },
+};
+function syncInputs() {
+  for (const k of Object.keys(FIELDS)) { $("f-" + k).value = F[k]; $("o-" + k).textContent = FIELDS[k].fmt(F[k]); }
+  $("f-growth").checked = F.growth;
+}
+function setPreset(name) {
+  document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.preset === name));
+}
+for (const k of Object.keys(FIELDS)) {
+  $("f-" + k).addEventListener("input", (e) => { F[k] = parseFloat(e.target.value); $("o-" + k).textContent = FIELDS[k].fmt(F[k]); setPreset(null); render(); });
+}
+$("f-growth").addEventListener("change", (e) => { F.growth = e.target.checked; setPreset(null); render(); });
+document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => {
+  F = { ...PRESETS[b.dataset.preset] }; setPreset(b.dataset.preset); syncInputs();
+  if (b.dataset.preset === "bandar") selectTab("bandar");
+  render();
+}));
+$("reset").addEventListener("click", () => { F = { ...DEFAULT }; setPreset("default"); syncInputs(); render(); });
+function selectTab(t) {
+  tab = t;
+  document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === t));
+  if (t === "bandar") { sortKey = "vol_ratio"; sortDir = -1; } else if (sortKey === "vol_ratio") { sortKey = "skor"; sortDir = -1; }
+}
+document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => { selectTab(b.dataset.tab); render(); }));
+$("thead").addEventListener("click", (e) => {
+  const th = e.target.closest("th"); if (!th || th.classList.contains("nosort")) return;
+  const k = th.dataset.key;
+  if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = k === "kode" || k === "per" || k === "pbv" ? 1 : -1; }
+  render();
+});
+$("search").addEventListener("input", (e) => { query = e.target.value; render(); });
+
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2200); }
+$("copy").addEventListener("click", async () => {
+  const codes = rowsCache.map((s) => s.kode).join(", ");
+  if (!codes) return toast("Daftar kosong");
+  try { await navigator.clipboard.writeText(codes); toast(rowsCache.length + " kode disalin"); }
+  catch { toast("Tidak bisa menyalin di sini: " + codes.slice(0, 60) + (codes.length > 60 ? "…" : "")); }
+});
+
+/* ---------- drawer detail ---------- */
+function drawLine(canvas, closes) {
+  const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const c = canvas.getContext("2d"); c.scale(dpr, dpr); c.clearRect(0, 0, w, h);
+  if (!closes || closes.length < 2) return;
+  const css = getComputedStyle(document.documentElement);
+  const mn = Math.min(...closes), mx = Math.max(...closes), r = mx - mn || 1;
+  const up = closes[closes.length - 1] >= closes[0];
+  const col = css.getPropertyValue(up ? "--up" : "--down").trim();
+  const padR = 56, X = (i) => (i / (closes.length - 1)) * (w - padR - 4) + 2, Y = (v) => h - 14 - ((v - mn) / r) * (h - 28);
+  c.strokeStyle = css.getPropertyValue("--line").trim(); c.lineWidth = 1; c.fillStyle = css.getPropertyValue("--muted").trim(); c.font = "11px " + css.getPropertyValue("--mono");
+  [mn, (mn + mx) / 2, mx].forEach((v) => { const y = Math.round(Y(v)) + .5; c.beginPath(); c.moveTo(0, y); c.lineTo(w - padR, y); c.stroke(); c.fillText(nf.format(Math.round(v)), w - padR + 6, y + 4); });
+  const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, col + "44"); g.addColorStop(1, col + "00");
+  c.beginPath(); closes.forEach((v, i) => i ? c.lineTo(X(i), Y(v)) : c.moveTo(X(i), Y(v)));
+  c.lineTo(X(closes.length - 1), h); c.lineTo(X(0), h); c.closePath(); c.fillStyle = g; c.fill();
+  c.beginPath(); closes.forEach((v, i) => i ? c.lineTo(X(i), Y(v)) : c.moveTo(X(i), Y(v)));
+  c.strokeStyle = col; c.lineWidth = 1.8; c.stroke();
+  c.beginPath(); c.arc(X(closes.length - 1), Y(closes[closes.length - 1]), 3.5, 0, 7); c.fillStyle = col; c.fill();
+}
+function checkRow(ok, label, val, rule) {
+  const icon = ok === null ? `<i class="mut">·</i>` : ok ? `<i class="up">✓</i>` : `<i class="down">✕</i>`;
+  return `<div class="check">${icon}<span>${label} <span class="mut">${rule}</span></span><span class="num">${val}</span></div>`;
+}
+function openDrawer(s) {
+  $("d-code").textContent = s.kode;
+  $("d-name").textContent = [s.nama, s.sektor].filter(Boolean).join(" · ");
+  $("d-price").textContent = "Rp" + nf.format(s.harga);
+  $("d-chg").innerHTML = `<span class="${cls(s.chg_1d)}">${pct(s.chg_1d)} hari ini</span> · <span class="${cls(s.chg_20d)}">${pct(s.chg_20d)} 20 hari</span>`;
+  $("d-score").textContent = "Skor " + nf1.format(s.skor);
+  $("d-checks").innerHTML = s.checks.map((c) => checkRow(c.na ? false : c.pass, c.k, c.na ? "n/a" : c.show(c.v), c.rule)).join("")
+    + (s.sektor === KEUANGAN ? checkRow(null, "DER", "dilewati", "bank/keuangan") : "");
+  $("d-liq").innerHTML = [
+    checkRow((s.avg_value_20d ?? 0) >= F.val * 1e9, "Nilai transaksi 20H", rp(s.avg_value_20d), "≥ Rp" + F.val + " M"),
+    checkRow(s.spike, "Volume hari ini", isNum(s.vol_ratio) ? nf2.format(s.vol_ratio) + "×" : "–", "≥ " + nf1.format(F.spike) + "×"),
+    checkRow(s.akum, "Median volume 5H", isNum(s.vol_ratio_5d) ? nf2.format(s.vol_ratio_5d) + "×" : "–", "≥ " + nf1.format(F.akum) + "×, harga ±5%"),
+    checkRow(null, "Dari harga tertinggi 1 tahun", pct(s.jarak_high_52w), ""),
+  ].join("");
+  $("d-note").textContent = s.mata_uang_laporan && s.mata_uang_laporan !== "IDR" ? "Laporan keuangan emiten ini dalam " + s.mata_uang_laporan + "; PBV sudah dikonversi ke Rupiah." : "";
+  document.body.classList.add("open"); $("drawer").setAttribute("aria-hidden", "false");
+  requestAnimationFrame(() => drawLine($("d-chart"), s.closes));
+  $("d-close").focus();
+}
+function closeDrawer() { document.body.classList.remove("open"); $("drawer").setAttribute("aria-hidden", "true"); }
+$("tbody").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-i]"); if (tr) openDrawer(rowsCache[+tr.dataset.i]); });
+$("tbody").addEventListener("keydown", (e) => { if (e.key === "Enter") { const tr = e.target.closest("tr[data-i]"); if (tr) openDrawer(rowsCache[+tr.dataset.i]); } });
+$("scrim").addEventListener("click", closeDrawer);
+$("d-close").addEventListener("click", closeDrawer);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+
+/* ---------- hero: tape + chart animasi ---------- */
+function buildTape() {
+  const items = DATA.saham.filter((s) => isNum(s.chg_1d)).sort((a, b) => (b.avg_value_20d ?? 0) - (a.avg_value_20d ?? 0)).slice(0, 40)
+    .map((s) => `<span class="tape-item"><b>${s.kode}</b><span class="num">${nf.format(s.harga)}</span> <span class="num ${cls(s.chg_1d)}">${pct(s.chg_1d)}</span></span>`).join("");
+  $("tape").innerHTML = items + items;
+}
+
+function heroChart() {
+  const cv = $("hero-canvas"), ctx = cv.getContext("2d");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const css = getComputedStyle(document.documentElement);
+  const C = { up: css.getPropertyValue("--up").trim(), dn: css.getPropertyValue("--down").trim(), acc: css.getPropertyValue("--accent").trim(), line: css.getPropertyValue("--line").trim(), muted: css.getPropertyValue("--muted").trim(), mono: css.getPropertyValue("--mono").trim() };
+  const N = 54;
+  let candles = [], t0 = 0, W = 0, H = 0;
+
+  function gen() {
+    // fase: turun -> akumulasi datar (volume naik pelan) -> breakout dengan volume spike
+    let p = 100, out = [];
+    let seed = Math.random() * 1000;
+    const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    for (let i = 0; i < N; i++) {
+      let drift, vol, spread;
+      if (i < 16) { drift = -0.9 + rnd() * 0.9; vol = 0.35 + rnd() * 0.25; spread = 2.2; }
+      else if (i < 44) { drift = (rnd() - 0.5) * 1.1 + (90 - p) * 0.06; vol = 0.3 + (i - 16) / 28 * 0.35 + rnd() * 0.15; spread = 1.4; }
+      else if (i === 44) { drift = 7.5; vol = 1; spread = 2; }
+      else { drift = 0.4 + rnd() * 1.6; vol = 0.5 + rnd() * 0.3; spread = 2; }
+      const o = p, c = p + drift, hi = Math.max(o, c) + rnd() * spread, lo = Math.min(o, c) - rnd() * spread;
+      out.push({ o, c, hi, lo, vol, spike: i === 44 });
+      p = c;
+    }
+    return out;
+  }
+  function size() {
+    const dpr = window.devicePixelRatio || 1; W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function draw(progress, flash) {
+    ctx.clearRect(0, 0, W, H);
+    const padR = 48, volH = H * 0.2, priceH = H - volH - 18;
+    const mn = Math.min(...candles.map((k) => k.lo)), mx = Math.max(...candles.map((k) => k.hi)), r = mx - mn;
+    const Y = (v) => 8 + (1 - (v - mn) / r) * (priceH - 16);
+    const cw = (W - padR) / N, bw = Math.max(2, cw * 0.62);
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.fillStyle = C.muted; ctx.font = "10.5px " + C.mono;
+    for (let g = 0; g <= 4; g++) {
+      const v = mn + (r * g) / 4, y = Math.round(Y(v)) + .5;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W - padR, y); ctx.stroke();
+      ctx.fillText(nf.format(Math.round(v * 3.4)), W - padR + 6, y + 3);
+    }
+    // zona akumulasi
+    const shown = progress * N;
+    if (shown > 18) {
+      const x0 = 16 * cw, x1 = Math.min(shown, 44) * cw;
+      ctx.fillStyle = C.acc + "14"; ctx.fillRect(x0, 8, x1 - x0, priceH - 16);
+      ctx.fillStyle = C.acc; ctx.font = "600 10.5px " + C.mono; ctx.fillText("ZONA AKUMULASI", x0 + 8, 22);
+    }
+    for (let i = 0; i < N; i++) {
+      const a = Math.max(0, Math.min(1, shown - i)); if (a <= 0) break;
+      const k = candles[i], x = i * cw + cw / 2, up = k.c >= k.o;
+      const col = k.spike ? C.acc : up ? C.up : C.dn;
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(Math.round(x) + .5, Y(k.hi)); ctx.lineTo(Math.round(x) + .5, Y(k.lo)); ctx.stroke();
+      const yo = Y(k.o), yc = Y(k.o + (k.c - k.o) * a);
+      ctx.fillStyle = col; ctx.fillRect(x - bw / 2, Math.min(yo, yc), bw, Math.max(1, Math.abs(yc - yo)));
+      const vh = k.vol * volH * (k.spike ? 1 : 0.9) * a;
+      ctx.globalAlpha = a * (k.spike ? 1 : 0.45);
+      ctx.fillRect(x - bw / 2, H - vh, bw, vh);
+      ctx.globalAlpha = 1;
+      if (k.spike && a >= 1) {
+        const pulse = flash;
+        ctx.strokeStyle = C.acc; ctx.globalAlpha = 0.25 + 0.5 * pulse; ctx.lineWidth = 1.5;
+        ctx.strokeRect(x - bw / 2 - 4, H - vh - 4, bw + 8, vh + 4); ctx.lineWidth = 1; ctx.globalAlpha = 1;
+        const label = HERO_LABEL;
+        ctx.font = "600 11px " + C.mono; const tw = ctx.measureText(label).width;
+        const lx = Math.min(x - tw / 2, W - padR - tw - 12), ly = H - vh - 30;
+        ctx.fillStyle = C.acc; ctx.beginPath(); ctx.roundRect(lx - 6, ly - 13, tw + 12, 20, 5); ctx.fill();
+        ctx.fillStyle = "#1a1205"; ctx.fillText(label, lx, ly + 1);
+      }
+    }
+    ctx.fillStyle = C.muted; ctx.font = "10.5px " + C.mono; ctx.fillText("VOLUME", 4, H - volH - 4);
+  }
+  function frame(t) {
+    if (!t0) t0 = t;
+    const el = (t - t0) / 1000, build = 4.2, hold = 3.2;
+    const progress = Math.min(1, el / build);
+    const flash = el > build ? 0.5 + 0.5 * Math.sin((el - build) * 4) : 0;
+    draw(progress, flash);
+    if (el > build + hold) { candles = gen(); t0 = t; }
+    if (!document.hidden) requestAnimationFrame(frame); else waiting = true;
+  }
+  let waiting = false;
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && waiting) { waiting = false; t0 = 0; requestAnimationFrame(frame); } });
+  candles = gen(); size();
+  addEventListener("resize", () => { size(); if (reduce) draw(1, 1); });
+  if (reduce) draw(1, 1); else requestAnimationFrame(frame);
+}
+
+function countUp(el, to) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = to; return; }
+  const t0 = performance.now(), d = 1100;
+  const step = (t) => { const p = Math.min(1, (t - t0) / d); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+/* ---------- boot ---------- */
+function boot() {
+  const d = new Date(DATA.tanggal_data + "T00:00:00");
+  const tgl = d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  $("stamp").textContent = "Data penutupan " + tgl;
+  $("foot-date").textContent = "Sumber: Yahoo Finance · penutupan " + tgl;
+  document.querySelectorAll("#headline .w").forEach((w, i) => w.style.animationDelay = i * 0.08 + "s");
+  syncInputs(); render();
+  const all = DATA.saham.map(evaluate);
+  const spikers = all.filter((s) => s.spike).sort((a, b) => b.vol_ratio - a.vol_ratio);
+  $("hs-total").textContent = all.length; $("hs-watch").textContent = all.filter((s) => s.fund && s.likuid).length; $("hs-spike").textContent = spikers.length;
+  countUp($("hs-total"), all.length); countUp($("hs-watch"), all.filter((s) => s.fund && s.likuid).length); countUp($("hs-spike"), spikers.length);
+  if (spikers[0]) { $("hc-code").textContent = spikers[0].kode; HERO_LABEL = "VOL " + nf1.format(spikers[0].vol_ratio) + "× rata-rata"; }
+  buildTape(); heroChart();
+}
+
+fetch("data.json", { cache: "no-cache" })
+  .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  .then((d) => { DATA = d; boot(); })
+  .catch(() => { $("tbody").innerHTML = `<tr><td colspan="13" class="empty">Data gagal dimuat. Muat ulang halaman, atau cek apakah data.json ada di repo.</td></tr>`; });
+</script>
+</body>
+</html>

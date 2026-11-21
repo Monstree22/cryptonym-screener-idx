@@ -1,0 +1,4 @@
+__pycache__/
+hasil_screener/
+*.pyc
+.vercel
